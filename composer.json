@@ -1,0 +1,15 @@
+{
+    
+    "autoload": {
+
+        "classmap": [
+
+            "./"
+
+        ]
+
+    },
+    "require": {
+        "monolog/monolog": "^2.0"
+    }
+}
