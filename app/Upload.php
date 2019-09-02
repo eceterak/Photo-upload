@@ -33,7 +33,7 @@ class Upload
 
     public function setMaxFileSize($size)
     {
-        $this->max_size = integer($size);
+        $this->max_size = (int) $size;
     }
 
     public function setUploadDirectory($dir)
@@ -43,18 +43,23 @@ class Upload
 
     public function persist()
     {
+        $_SESSION['resized'] = '';
+
         try {
             $this->checkIfValid();
             $this->upload();
+            $this->resize();
         }
         catch(Exception $e)
         {
-            $this->errors = $e->getMessage();
+            $this->setErrors($e->getMessage());
         }
     }
 
     public function resize()
     {
+        $resized = array();
+        
         for($i = 0; $i < count($this->files['name']); $i++)
         {
             if(!empty($this->files['name'][$i])) {
@@ -62,31 +67,44 @@ class Upload
 
                 if(file_exists($img) && is_file($img)) 
                 {
-                    $this->resizeEngine->persist($img);
+                    if($this->resizeEngine->persist($img))
+                    {
+                        $resized[] = $this->dir.'/'.$this->files['name'][$i];
+
+                        $this->logger->info('Image resized', [
+                            'name' => $this->files['name'][$i],
+                            'new_size' => $this->files['size'][$i],
+                            'new_dimensions' => getimagesize($img)[3],
+                            'date' => new DateTime()
+                        ]);
+                    }
                 }
             }
         }
 
-        return true;
+        if(!empty($resized)) $_SESSION['resized'] = $resized;
     }
 
     public function checkIfValid()
     {
         for($i = 0; $i < count($this->files['name']); $i++)
         {
-            if(!empty($this->files['name'][$i])) {
+            if(!empty($this->files['name'][$i])) 
+            {
                 if($this->checkExtension($this->files['tmp_name'][$i], $this->files['name'][$i]) == false)
                 {
-                    throw new Exception('Wrong extension');
+                    throw new Exception('Invalid broken image file. Allowed extensions are: '.join(", ", $this->allowed_extensions));
                 }
                 elseif($this->files['size'][$i] > $this->max_size)
                 {
-                    throw new Exception('Maximum size');
+                    throw new Exception('File is too large. Maximum file size is '.$this->max_size);
                 }
             }
+            else 
+            {
+                throw new Exception('You need to choose a file.');
+            }
         }
-
-        return true;
     }
 
     private function checkExtension($tmpName, $name) 
@@ -123,12 +141,16 @@ class Upload
                 }
                 else
                 {
-                    throw new Exception('Error when uploading');
+                    throw new Exception('Upload error. Try again.');
                 }
             }
         }
-
-        return true;
     }
 
+    private function setErrors($error)
+    {
+        $this->errors = true;
+
+        $_SESSION['upload_error'] = $error;
+    }
 }

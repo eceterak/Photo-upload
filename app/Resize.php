@@ -4,30 +4,40 @@ namespace app;
 
 class Resize
 {
-    private $height = null;
-    private $width = null;
     private $image = null;
+    private $image_info = null;
+    private $width = null;
+    private $height = null;
 
-    public function __construct($height, $width)
+    public function __construct($width, $height)
     {
-        $this->height = (int) $height;
         $this->width = (int) $width;
+        $this->height = (int) $height;
     }
 
     public function persist($image)
     {
-        $this->getImageType($image);
+        $this->init($image);
+        $resized = $this->resize();
+        
+        if($resized)
+        {
+            $this->createImage($resized, $image);
+        }
+        else
+        {
+            throw new Exception('Image can not be resized.');
+        }
 
-        $this->resize($image);
 
-        return $this->image;
+        return true;
     }
 
-    private function getImageType($image)
+    private function init($image)
     {
-        $data = getimagesize($image);
+        $this->image_info = getimagesize($image);
 
-        switch($data['mime'])
+        switch($this->image_info['mime'])
         {
             case 'image/jpeg':
                 $this->image = imagecreatefromjpeg($image);
@@ -41,12 +51,29 @@ class Resize
         }
     }
 
-    private function resize($image)
+    private function resize()
     {
-        var_dump($this);
+        $width = $this->width ? $this->width : $this->image_info[0];
+        $height = $this->height ? $this->height : $this->image_info[1];
+        
+        $resized = imagescale($this->image, $width, $height);
 
-        $resized = imagescale($this->image, 100, 100);
+        return $resized;
+    }
 
-        imagejpeg($resized, $image);
+    private function createImage($resized, $image)
+    {
+        switch($this->image_info['mime'])
+        {
+            case 'image/jpeg':
+                $this->image = imagejpeg($resized, $image);
+            break;
+            case 'image/png':
+                $this->image = imagepng($image);
+            break;
+            case 'image/gif':
+                $this->image = imagegif($image);
+            break;
+        }
     }
 }
